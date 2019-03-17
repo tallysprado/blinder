@@ -1,3 +1,2 @@
-include ':app', ':tess-two'
-include ':openCVLibrary320'
-project(':tess-two').projectDir = new File('tess/tess-two')
+include ':app'
+include ':openCVLibrary331'
