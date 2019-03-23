@@ -226,8 +226,12 @@ public class MainActivity_OPENCV extends AppCompatActivity implements CameraBrid
     ArrayList<Mat> rects = new ArrayList<Mat>();
 
     private Mat detectRect(Mat dst) {
-        Mat rgb1 = new Mat(), gray = new Mat();
-        rgb1 = dst.clone();
+
+        Mat gray = new Mat(), rgb1 = dst.clone();
+        Mat rgbGaussianBlur = new Mat(), rgbThres = new Mat();
+  //      Imgproc.GaussianBlur(dst,rgbGaussianBlur,new Size(3,3),0);
+//        Imgproc.adaptiveThreshold(rgbGaussianBlur,rgbThres,255,Imgproc.ADAPTIVE_THRESH_MEAN_C,Imgproc.THRESH_BINARY,11,3);
+
         Imgproc.cvtColor(dst, gray, Imgproc.COLOR_RGBA2GRAY);
 
 
@@ -463,21 +467,22 @@ public class MainActivity_OPENCV extends AppCompatActivity implements CameraBrid
 
         StringBuilder stringBuilder = new StringBuilder();
 
-
+        String str = null;
         for (int i = 0; i < items.size(); i++) {
             TextBlock item = (TextBlock) items.valueAt(i);
             size = items.size();
+            if(letter(item.getValue())>10) str = item.getValue();
             stringBuilder.append(item.getValue());
             stringBuilder.append("\n");
             textView.setText(stringBuilder.toString());
         }
         Log.i("DETECTION2", stringBuilder.toString());
-        return new Pair<String, Integer>(stringBuilder.toString(), size);
+        return new Pair<String, Integer>(str, size);
     }
 
     Mat resized = new Mat();
     Size size = new Size(10, 10);
-
+    Mat adThres = new Mat();
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
 
@@ -485,32 +490,67 @@ public class MainActivity_OPENCV extends AppCompatActivity implements CameraBrid
         gray = inputFrame.gray();
 
         try {
-            rect = detectRect(rgb);
-            Mat gaussianBlur = new Mat(), adaptiveThreshold = new Mat();
 
-            resized = rgb.clone();
+            final Mat gaussianBlur = new Mat(), grayResized = new Mat(), adaptiveThreshold = new Mat();
+
+
+            rect = detectRect(rgb);
+
+            Imgproc.cvtColor(rect,grayResized,Imgproc.COLOR_RGBA2GRAY);
+            Log.i("CONVERTED",grayResized.toString());
+            final Mat resized1 = new Mat();
             size.height = rect.height() * 4;
             size.width = rect.width() * 4;
-            Imgproc.resize(rect, resized, size);
+            Imgproc.resize(grayResized, resized1, size);
 
-            Imgproc.GaussianBlur(gray, gaussianBlur, new Size(3, 3), 0);
-            Imgproc.adaptiveThreshold(gaussianBlur, adaptiveThreshold, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 99, 4);
-
-            final Pair<String, Integer> txt = detection2(resized);
+            Imgproc.GaussianBlur(resized1,gaussianBlur, new Size(3,3), 0);
+            //Imgproc.cvtColor(gaussianBlur,grayResized,Imgproc.COLOR_RGBA2GRAY);
+            Imgproc.adaptiveThreshold(gaussianBlur,adaptiveThreshold,255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY,11,3);
             runOnUiThread(new Runnable() {
                 public void run() {
+
                     try {
+                        Mat mRgba = new Mat();
+                         Imgproc.cvtColor(adaptiveThreshold, mRgba,Imgproc.COLOR_GRAY2RGBA);
+
+
+/*
+                        resized = new Mat();
+                        size.height = rect.height() * 4;
+                        size.width = rect.width() * 4;
+                        Imgproc.resize(rect, resized, size);
+*/
+                        Pair<String, Integer> txt = detection2(mRgba);
+                        //Mat imgGaussianBlur = new Mat();
+                        //Imgproc.GaussianBlur(gray,imgGaussianBlur,new Size(3, 3),0);
+                        Imgproc.resize(mRgba, mRgba, new Size(rect.width(),rect.height()));
+                        imageView.setImageBitmap(getBmp(mRgba));
+                        //Mat imgAdaptiveThreshold = new Mat();
+                        //Imgproc.adaptiveThreshold(imgGaussianBlur, imgAdaptiveThreshold, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C ,Imgproc.THRESH_BINARY, 11, 4);
+                        //Pair<String, Integer> txt1 = detection2(adaptiveThreshold);
+
+                        
+                        //textView2.setText(txt1.first);
+
 
                         String str = txt.first;
-                        textView.setText(str);
+                        String lines[] = str.split("\\r?\\n");
+                        String str2 = (String) textView.getText();
 
+                        if(letter(lines[0])>letter(str2) && digits(lines[0])<3) textView.setText(lines[0]);
+                        else if (letter(lines[0])>10 && lines.length<=2) textView.setText(lines[0]);
+
+                        //adThres = imgAdaptiveThreshold.clone();
                         Log.i("TEXTDETECTOR", str);
 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
+
             });
+            return rgb;
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -922,9 +962,7 @@ public class MainActivity_OPENCV extends AppCompatActivity implements CameraBrid
                 //textView.setText(detection2(resized));
 
                 try {
-                    Pair<String, Integer> txt = detection2(resized);
-                    textView.setText(txt.first);
-                    imageView.setImageBitmap(getBmp(rect));
+
 
                 } catch (Exception e) {
                     e.printStackTrace();
